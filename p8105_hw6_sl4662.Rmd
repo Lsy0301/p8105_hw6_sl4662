@@ -31,6 +31,10 @@ theme_set(theme_minimal() + theme(legend.position = "bottom"))
 set.seed(1)
 ```
 
+# Problem 1
+
+## Data Cleaning
+
 ```{r}
 birth_data = read.csv("./data/birthweight.csv")
 
@@ -61,7 +65,123 @@ birth_data =
                          "black" = "2",
                          "asian" = "3",
                          "puerto_rican" = "4",
-                         "other" = "8")
+                         "other" = "8"),
+    id = 1:4342,
          )
+```
+
+
+## Build my model 
+
+```{r}
+birth_data %>% 
+  ggplot(aes(x = blength, y = bwt)) + 
+  geom_point() + theme_bw()
+
+birth_data %>% 
+  ggplot(aes(x = bhead, y = bwt)) + 
+  geom_point() + theme_bw()
+
+birth_data = 
+  birth_data %>% 
+  mutate(
+    babysex = fct_infreq(babysex),
+    frace = fct_infreq(frace),
+    malform = fct_infreq(malform),
+    mrace = fct_infreq(mrace),
+    )
+
+# Backward elimination:
+everything_fit = lm(formula = bwt ~ . -id, data = birth_data) 
+summary(everything_fit)
+# No NAs (pnumlbw, wtgain, pnumsga)
+step1<-update(everything_fit, . ~ . -pnumlbw -wtgain -pnumsga)
+summary(step1)
+# No momage
+step2<-update(step1, . ~ . -momage)
+summary(step2)
+# No ppbmi
+step3<-update(step2, . ~ . -ppbmi)
+summary(step3)
+# No frace
+step4<-update(step3, . ~ . -frace)
+summary(step4)
+# No malform
+step5<-update(step4, . ~ . -malform)
+summary(step5)
+# No fincome
+step6<-update(step5, . ~ . -fincome)
+summary(step6)
+# No menarche
+mymodel<-update(step6, . ~ . -menarche)
+summary(mymodel)
+```
+
+### Use method of backward elimination learned in Biostatistics class, which takes out non-significant variables 'one at a time', starting with the highest p-value. Conclusion is that predictors are: `babysex`, `bhead`, `blength`, `delwt`, `gaweeks`, `mheight`, `mrace`, `parity`, `ppwt`, `smoken`.
+
+```{r}
+prediction_residual = 
+  birth_data %>% 
+  add_predictions(mymodel) %>% 
+  add_residuals(mymodel)
+
+prediction_residual %>% 
+  ggplot(aes(x = pred, y = resid)) + 
+  geom_point(color = "purple", alpha = 0.5, size = 0.5) +
+  geom_smooth(method = "lm") +
+  labs(x = "Predicted/Fitted Value",
+       y = "Residual", 
+       title = "Residual Plot")
+```
+
+### As shown in the plot, residues has a random pattern and evenly distrubuted around 0. 
+
+
+## Compare with model: 
+
+### 1: using length at birth and gestational age as predictors (main effects only)
+
+### 2: using head circumference, length, sex, and all interactions (including the three-way interaction) between these
+```{r}
+model1 = lm(formula = bwt ~ blength + gaweeks, data = birth_data) 
+summary(model1)
+
+model2 = lm(formula = bwt ~ bhead*blength*babysex, data = birth_data) 
+summary(model2)
+
+```
+
+### Cross Validation
+```{r}
+cv_df =
+  crossv_mc(birth_data, 100) %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
+
+cv_df = 
+  cv_df %>% 
+  mutate(mymodel = map(train, ~lm(bwt ~ babysex + bhead + blength + delwt + gaweeks + mheight + mrace + parity + ppwt + smoken, data = .x)),
+         model1 = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+         model2 = map(train, ~gam(bwt ~ bhead*blength*babysex, data = .x))) %>% 
+  mutate(rmse_mymodel = map2_dbl(mymodel, test, ~rmse(model = .x, data = .y)),
+         rmse_model1 = map2_dbl(model1, test, ~rmse(model = .x, data = .y)),
+         rmse_model2 = map2_dbl(model2, test, ~rmse(model = .x, data = .y)))
+
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
+```
+
+# Problem 2
+
+```{r}
+
 ```
 
