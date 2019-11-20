@@ -209,7 +209,7 @@ weather_df %>%
     models = map(strap, ~ lm(tmax ~ tmin, data = .x)),
     results = map(models, broom::tidy),
     rsquare = map(models, broom::glance)) %>% 
-  select(results, rsquare) %>% 
+  select(.id, results, rsquare) %>% 
   unnest(results, rsquare)
 
 result %>% 
@@ -217,6 +217,29 @@ result %>%
   ggplot(aes(x = estimate)) + geom_density()
 
 result %>% 
-  select(term, estimate, r.squared)
+  select(.id, term, estimate, r.squared) %>% 
+  group_by(.id) %>% 
+  summarize(mean_r = mean(r.squared)) %>% 
+  ggplot(aes(x = mean_r)) + geom_density()
+
+
+beta0 = 
+  result %>% 
+  select(.id, term, estimate, r.squared) %>% 
+  group_by(.id) %>% 
+  filter(term == "(Intercept)") %>% 
+  summarize(beta0 = estimate)
+
+beta1 = 
+  result %>% 
+  select(.id, term, estimate, r.squared) %>% 
+  group_by(.id) %>% 
+  filter(term == "tmin") %>% 
+  summarize(beta1 = estimate)
+
+bind_cols(beta0, beta1)%>% 
+  group_by(.id) %>% 
+  summarize(log_beta = log(beta0 * beta1)) %>% 
+  ggplot(aes(x = log_beta)) + geom_density()
 ```
 
