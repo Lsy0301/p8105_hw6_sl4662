@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(modelr)
 library(mgcv)
+library(patchwork)
 
 knitr::opts_chunk$set(
 	echo = TRUE,
@@ -38,7 +39,7 @@ set.seed(1)
 ```{r}
 birth_data = read.csv("./data/birthweight.csv")
 
-lapply(birth_data, class)
+check_class = lapply(birth_data, class)
 
 birth_data = 
   birth_data %>% 
@@ -216,11 +217,15 @@ result %>%
   filter(term == "tmin") %>% 
   ggplot(aes(x = estimate)) + geom_density()
 
-result %>% 
+r.squared = 
+  result %>% 
   select(.id, term, estimate, r.squared) %>% 
   group_by(.id) %>% 
-  summarize(mean_r = mean(r.squared)) %>% 
-  ggplot(aes(x = mean_r)) + geom_density()
+  summarize(mean_r.squared = mean(r.squared)) 
+
+r = 
+  r.squared %>% 
+  ggplot(aes(x = mean_r.squared)) + geom_density()
 
 
 beta0 = 
@@ -237,9 +242,26 @@ beta1 =
   filter(term == "tmin") %>% 
   summarize(beta1 = estimate)
 
-bind_cols(beta0, beta1)%>% 
+ log_beta = 
+  bind_cols(beta0, beta1) %>% 
   group_by(.id) %>% 
-  summarize(log_beta = log(beta0 * beta1)) %>% 
+  summarize(log_beta = log(beta0 * beta1)) 
+ 
+ beta_product = 
+  log_beta %>% 
   ggplot(aes(x = log_beta)) + geom_density()
+ 
+r + beta_product
 ```
 
+```{r}
+r_result = r.squared$mean_r.squared
+quantile(r_result, c(.025, .975)) 
+
+beta_result = log_beta$log_beta
+quantile(beta_result, c(.025, .975)) 
+```
+
+### 95% confidence interval for r squared is :0.8936278 and 0.9274813. 
+
+### 95% confidence interval for log(B1*B2) is :1.964565 and 2.057922. 
