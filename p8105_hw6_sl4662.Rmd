@@ -180,6 +180,8 @@ pivot_longer(
   ggplot(aes(x = model, y = rmse)) + geom_violin()
 ```
 
+### My model has lowest RMSE compared to others. Therefore, my model preditcts better. 
+
 # Problem 2
 
 ```{r}
